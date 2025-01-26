@@ -1,0 +1,37 @@
+# Pedir al usuario que ingrese el número del disco a utilizar
+Write-Host "Introduce el número del disco que deseas utilizar:"
+$diskNumber = Read-Host "Número del disco"
+
+# Crear un archivo temporal con los comandos de DiskPart
+$tempFile = "$env:TEMP\diskpart_commands.txt"
+
+# Crear los comandos de DiskPart
+$commands = @"
+select disk $diskNumber
+clean
+convert mbr
+"@
+
+# Añadir comandos para crear particiones de 1 GB hasta que no quede espacio
+$partitionNumber = 1
+$keepCreating = $true
+while ($keepCreating) {
+    $commands += @"
+create partition primary size=1024
+assign letter=$([char]([int]'A' + $partitionNumber))
+format fs=ntfs quick
+"@
+    $partitionNumber++
+    if ($partitionNumber -ge 26) { $keepCreating = $false }
+}
+
+# Guardar los comandos en el archivo temporal
+Set-Content -Path $tempFile -Value $commands
+
+# Ejecutar DiskPart con los comandos generados
+Start-Process diskpart -ArgumentList "/s $tempFile" -Wait
+
+# Eliminar el archivo temporal
+Remove-Item $tempFile -Force
+
+Write-Host "Proceso completado. Las particiones han sido creadas."
